@@ -130,6 +130,8 @@ class Console
         }
 
         Common::Font font;
+        std::string current_cmd;
+        void ProcessCommand();
 
     private:
         void Render();
@@ -142,7 +144,6 @@ class Console
         int CharLength(char c);
         int CountLinesBetween(const LineIterator &a, const LineIterator &b);
 
-        void ProcessCommand();
         int Command(const std::string &cmd);
         void PrintBase(const Line &line);
 
@@ -158,7 +159,6 @@ class Console
         Surface surface;
         LogContainer lines;
         LineIterator line_pos;
-        std::string current_cmd;
 
         std::vector<std::string> commandsHistory;
         int commandsHistoryIndex;

@@ -115,6 +115,7 @@ struct TextLayout
 
 ScConsole::ScConsole()
 {
+    cursor_pos = 0;  // Add this line
     show_fps = true;
     show_frame = false;
     draw_info = false;
@@ -1844,6 +1845,7 @@ void ScConsole::HookWndProc(void* hwnd)
     OldWndProc = (WndProc*)SetWindowLongPtr((HWND)hwnd, GWLP_WNDPROC, (LONG)&ConsoleWndProc);
 }
 
+// Replace the Sc_KeyDown method:
 bool ScConsole::Sc_KeyDown(int key, int scan)
 {
     if (state != shown) {
@@ -1854,18 +1856,63 @@ bool ScConsole::Sc_KeyDown(int key, int scan)
             frame_skip_ms = 360;
             bw::game_speed_waits[*bw::game_speed] = 0;
             break;
+        case VK_LEFT:
+            // Move cursor left in the current command text
+            if (cursor_pos > 0) {
+                cursor_pos--;
+            }
+            return true;  // Consume the event
+        case VK_RIGHT:
+            // Move cursor right in the current command text
+            if (cursor_pos < current_cmd.length()) {
+                cursor_pos++;
+            }
+            return true;  // Consume the event
+        case VK_HOME:
+            // Move cursor to beginning of line
+            cursor_pos = 0;
+            return true;
+        case VK_END:
+            // Move cursor to end of line
+            cursor_pos = current_cmd.length();
+            return true;
+        case VK_DELETE:
+            // Delete character at cursor position
+            if (cursor_pos < current_cmd.length()) {
+                current_cmd.erase(cursor_pos, 1);
+                dirty = true;
+            }
+            return true;
+        case VK_BACK:
+            // Backspace - delete character before cursor
+            if (cursor_pos > 0) {
+                current_cmd.erase(cursor_pos - 1, 1);
+                cursor_pos--;
+                dirty = true;
+            }
+            return true;
         }
     }
+
     switch (key)
     {
     case VK_ESCAPE:
         if (isFastForwarding)
             EndFastForward();
         break;
+    case VK_LEFT:
+    case VK_RIGHT:
+    case VK_HOME:
+    case VK_END:
+    case VK_DELETE:
+        return true;  // Consume these keys
     }
 
     return false;
 }
+
+// Update CharHook to respect cursor position (if you have one, or override it):
+// When a character is typed, it should insert at cursor_pos instead of appending
 
 bool ScConsole::Sc_KeyUp(int key, int scan)
 {
@@ -1880,4 +1927,50 @@ bool ScConsole::Sc_KeyUp(int key, int scan)
         }
     }
     return false;
+}
+
+
+// Updated CharHook version 2 (simpler):
+bool ScConsole::CharHook(wchar_t chr)
+{
+    if (state != shown)
+        return false;
+
+    dirty = true;
+
+    switch (chr)
+    {
+    case 0x8: // Backspace
+        if (cursor_pos > 0) {
+            current_cmd.erase(cursor_pos - 1, 1);
+            cursor_pos--;
+        }
+        break;
+    case 0x1b: // Escape
+        current_cmd.clear();
+        cursor_pos = 0;
+        ResetHistoryNavigation();
+        break;
+    case 0xd: // Enter
+        ProcessCommand();
+        cursor_pos = 0;
+        break;
+    default:
+    {
+        char buf[8];
+        int count = WideCharToMultiByte(CP_UTF8, 0, &chr, 1, buf, sizeof buf, NULL, NULL);
+
+        // Prevent buffer overflow - limit to 512 chars
+        const size_t MAX_CMD_LENGTH = 512;
+        if (current_cmd.length() + count < MAX_CMD_LENGTH)
+        {
+            for (int i = 0; i < count; i++)
+                current_cmd.insert(cursor_pos + i, 1, buf[i]);
+            cursor_pos += count;
+        }
+    }
+    break;
+    }
+
+    return true;
 }

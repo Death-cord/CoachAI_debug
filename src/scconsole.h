@@ -34,9 +34,9 @@ class ScConsole : public Common::GenericConsole
         bool Sc_KeyDown(int key, int scan);
         bool Sc_KeyUp(int key, int scan);
 
+        bool CharHook(wchar_t chr);
+
     private:
-
-
         int GetConsolePlayer();
         bool CanUseSingleplayerCommand();
         void PrintSingleplayerOnlyError();
@@ -140,9 +140,54 @@ class ScConsole : public Common::GenericConsole
         vector<tuple<uint16_t, UnitType>> death_counters;
         vector<std::string> info_lines;
         vector<Grid> grids;
+
+        // Text editing with cursor support
+        static constexpr size_t MAX_CMD_LENGTH = 512;  // Maximum command length
+        size_t cursor_pos = 0;  // Current cursor position in current_cmd
 };
 
 void PatchConsole();
 
 #endif // SC_CONSOLE_H
 
+
+
+
+#ifndef SCCONSOLE_H
+#define SCCONSOLE_H
+
+#include <stdio.h>
+#include <stdlib.h>
+
+// Define a structure to hold the cursor position
+typedef struct {
+    int x;
+    int y;
+} CursorPosition;
+
+CursorPosition cursorPosition;
+
+// Function to initialize cursor position
+void initCursorPosition() {
+    cursorPosition.x = 0;
+    cursorPosition.y = 0;
+}
+
+// Function to move cursor left
+void moveCursorLeft() {
+    if (cursorPosition.x > 0) {
+        cursorPosition.x--;
+    }
+}
+
+// Function to move cursor right
+void moveCursorRight() {
+    cursorPosition.x++;
+}
+
+// Function to get cursor position
+CursorPosition getCursorPosition() {
+    return cursorPosition;
+}
+
+#endif // SCCONSOLE_H
