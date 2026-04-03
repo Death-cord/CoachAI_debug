@@ -113,9 +113,9 @@ struct TextLayout
     vector<Rect32> blocks;
 };
 
+// In ScConsole constructor, make sure cursor_pos is initialized:
 ScConsole::ScConsole()
 {
-    cursor_pos = 0;  // Add this line
     show_fps = true;
     show_frame = false;
     draw_info = false;
@@ -134,6 +134,7 @@ ScConsole::ScConsole()
     draw_coords = false;
     draw_range = false;
     draw_resource_areas = false;
+    cursor_pos = 0;  // Initialize cursor position here
 
     AddCommand("heal", &ScConsole::Heal);
     AddCommand("kill", &ScConsole::Kill);
@@ -1845,7 +1846,7 @@ void ScConsole::HookWndProc(void* hwnd)
     OldWndProc = (WndProc*)SetWindowLongPtr((HWND)hwnd, GWLP_WNDPROC, (LONG)&ConsoleWndProc);
 }
 
-// Replace the Sc_KeyDown method:
+// Use the updated Sc_KeyDown:
 bool ScConsole::Sc_KeyDown(int key, int scan)
 {
     if (state != shown) {
@@ -1857,43 +1858,23 @@ bool ScConsole::Sc_KeyDown(int key, int scan)
             bw::game_speed_waits[*bw::game_speed] = 0;
             break;
         case VK_LEFT:
-            // Move cursor left in the current command text
             if (cursor_pos > 0) {
                 cursor_pos--;
             }
-            return true;  // Consume the event
+            return true;
         case VK_RIGHT:
-            // Move cursor right in the current command text
             if (cursor_pos < current_cmd.length()) {
                 cursor_pos++;
             }
-            return true;  // Consume the event
+            return true;
         case VK_HOME:
-            // Move cursor to beginning of line
             cursor_pos = 0;
             return true;
         case VK_END:
-            // Move cursor to end of line
             cursor_pos = current_cmd.length();
-            return true;
-        case VK_DELETE:
-            // Delete character at cursor position
-            if (cursor_pos < current_cmd.length()) {
-                current_cmd.erase(cursor_pos, 1);
-                dirty = true;
-            }
-            return true;
-        case VK_BACK:
-            // Backspace - delete character before cursor
-            if (cursor_pos > 0) {
-                current_cmd.erase(cursor_pos - 1, 1);
-                cursor_pos--;
-                dirty = true;
-            }
             return true;
         }
     }
-
     switch (key)
     {
     case VK_ESCAPE:
@@ -1904,15 +1885,11 @@ bool ScConsole::Sc_KeyDown(int key, int scan)
     case VK_RIGHT:
     case VK_HOME:
     case VK_END:
-    case VK_DELETE:
-        return true;  // Consume these keys
+        return true;
     }
 
     return false;
 }
-
-// Update CharHook to respect cursor position (if you have one, or override it):
-// When a character is typed, it should insert at cursor_pos instead of appending
 
 bool ScConsole::Sc_KeyUp(int key, int scan)
 {
@@ -1928,7 +1905,6 @@ bool ScConsole::Sc_KeyUp(int key, int scan)
     }
     return false;
 }
-
 
 // Updated CharHook version 2 (simpler):
 bool ScConsole::CharHook(wchar_t chr)
