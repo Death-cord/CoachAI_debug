@@ -155,6 +155,7 @@ class Console
 
         bool ignore_next;
         bool clear;
+        int cursor_pos;
 
         Surface surface;
         LogContainer lines;

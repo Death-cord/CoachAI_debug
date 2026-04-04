@@ -146,6 +146,7 @@ Console::Console()
 
     ignore_next = false;
     clear = false;
+    cursor_pos = 0;
     if (prev_error && font.last_error)
     {
         MessageBoxA(0, "Fonts could not be loaded", "Console error", 0);
@@ -381,6 +382,7 @@ void Console::ProcessCommand()
     int color = Command(current_cmd);
     cmd_line.type = color;
     current_cmd.clear();
+    cursor_pos = 0;
     if (clear)
     {
         lines.clear();
@@ -533,6 +535,7 @@ void Console::NavigateHistoryUp() {
     dirty = true;
     current_cmd.clear();
     current_cmd = commandsHistory.at(commandsHistoryIndex);
+    cursor_pos = commandsHistory[commandsHistoryIndex].length();
 }
 
 void Console::NavigateHistoryDown() {
@@ -550,6 +553,7 @@ void Console::NavigateHistoryDown() {
     if (commandsHistoryIndex <= commandsHistory.size() - 1) {
         current_cmd = commandsHistory.at(commandsHistoryIndex);
     }
+    cursor_pos = (commandsHistoryIndex < commandsHistory.size() - 1) ? commandsHistory[commandsHistoryIndex].length() : 0;
 }
 
 bool Console::TranslateAcceleratorHook(void *msg_)
