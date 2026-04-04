@@ -283,10 +283,36 @@ void Console::Render()
         i++;
     }
     draw_pos = Point(5, surface.height - 5);
-    if (new_time & 1)
-        surface.DrawText(&font, current_cmd , draw_pos, colors[Color::own]);
+
+    // Render command line with cursor
+    if (state == shown && new_time & 1)  // Blinking cursor when console is shown
+    {
+        // Draw text with cursor in the middle
+        std::string before_cursor = current_cmd.substr(0, cursor_pos);
+        std::string after_cursor = current_cmd.length() > cursor_pos ?
+            current_cmd.substr(cursor_pos) : "";
+
+        surface.DrawText(&font, before_cursor, draw_pos, colors[Color::own]);
+
+        // Calculate cursor position
+        int cursor_x = draw_pos.x;
+        for (char c : before_cursor) {
+            cursor_x += CharLength(c);
+        }
+
+        // Draw cursor character (blinking underscore)
+        surface.DrawText(&font, "_", Point(cursor_x, draw_pos.y), colors[Color::own]);
+
+        // Draw text after cursor
+        surface.DrawText(&font, after_cursor, Point(cursor_x + CharLength('_'), draw_pos.y), colors[Color::own]);
+    }
     else
-        surface.DrawText(&font, current_cmd + '_', draw_pos, colors[Color::own]);
+    {
+        // When console is hidden or on even seconds, show normal blinking cursor
+        surface.DrawText(&font, current_cmd, draw_pos, colors[Color::own]);
+        if (!(new_time & 1))
+            surface.DrawText(&font, "_", Point(draw_pos.x + CharLength(current_cmd.back()), draw_pos.y), colors[Color::own]);
+    }
 
     dirty = false;
 }

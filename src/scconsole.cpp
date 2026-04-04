@@ -1846,22 +1846,18 @@ void ScConsole::HookWndProc(void* hwnd)
     OldWndProc = (WndProc*)SetWindowLongPtr((HWND)hwnd, GWLP_WNDPROC, (LONG)&ConsoleWndProc);
 }
 
-// Use the updated Sc_KeyDown:
+
 bool ScConsole::Sc_KeyDown(int key, int scan)
 {
-    if (state != shown) {
+    // Handle cursor movement and text editing when console IS VISIBLE AND SHOWN
+    if (state == shown) {
         switch (key)
         {
-        case VK_OEM_PLUS:
-        case VK_ADD:
-            frame_skip_ms = 360;
-            bw::game_speed_waits[*bw::game_speed] = 0;
-            break;
         case VK_LEFT:
             if (cursor_pos > 0) {
                 cursor_pos--;
             }
-            return true;
+            return true;  // Consume the key
         case VK_RIGHT:
             if (cursor_pos < current_cmd.length()) {
                 cursor_pos++;
@@ -1875,17 +1871,25 @@ bool ScConsole::Sc_KeyDown(int key, int scan)
             return true;
         }
     }
+
+    // Handle other keys when console is HIDDEN (game is running)
+    if (state != shown) {
+        switch (key)
+        {
+        case VK_OEM_PLUS:
+        case VK_ADD:
+            frame_skip_ms = 360;
+            bw::game_speed_waits[*bw::game_speed] = 0;
+            break;
+        }
+    }
+
     switch (key)
     {
     case VK_ESCAPE:
         if (isFastForwarding)
             EndFastForward();
         break;
-    case VK_LEFT:
-    case VK_RIGHT:
-    case VK_HOME:
-    case VK_END:
-        return true;
     }
 
     return false;
@@ -1904,6 +1908,42 @@ bool ScConsole::Sc_KeyUp(int key, int scan)
         }
     }
     return false;
+}
+
+
+// Add this method to ScConsole class to override the base Console::KeyHook
+
+bool ScConsole::KeyHook(int key, int scan)
+{
+    // Handle cursor movement in console
+    if (state == shown) {
+        switch (scan)
+        {
+        case 0x4B: // Left arrow
+            if (cursor_pos > 0) {
+                cursor_pos--;
+                dirty = true;
+            }
+            return true;
+        case 0x4D: // Right arrow
+            if (cursor_pos < current_cmd.length()) {
+                cursor_pos++;
+                dirty = true;
+            }
+            return true;
+        case 0x47: // Home
+            cursor_pos = 0;
+            dirty = true;
+            return true;
+        case 0x4F: // End
+            cursor_pos = current_cmd.length();
+            dirty = true;
+            return true;
+        }
+    }
+
+    // Call parent's KeyHook for other keys (up/down history, ~)
+    return Console::KeyHook(key, scan);
 }
 
 // Updated CharHook version 2 (simpler):
