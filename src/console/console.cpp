@@ -256,16 +256,18 @@ void Console::DrawBackground()
 
 void Console::Render()
 {
-    static time_t prev_time;
-    time_t new_time = std::time(0);
-    if (prev_time != new_time)
-    {
-        prev_time = new_time;
-    }
-    else if (!dirty)
-    {
+    // Skip rendering entirely if console is hidden
+    if (state == hidden)
         return;
-    }
+
+    // Rate limit: only render every 16ms (~60 FPS max)
+    static DWORD last_render_time = 0;
+    DWORD current_time = GetTickCount();
+
+    if (!dirty && (current_time - last_render_time) < 16)
+        return;  // Nothing changed and frame time limit not reached
+
+    last_render_time = current_time;
 
     DrawBackground();
     int i = 0, pos_hint = -1;
@@ -273,9 +275,9 @@ void Console::Render()
     for (auto it = line_pos; it != lines.end(); ++it)
     {
         if (i >= history_lines)
-            break; // ehk vois assert?
+            break;
 
-        Line &line = *it;
+        Line& line = *it;
         if (it.HLine() == 0)
             pos_hint = 0;
         string h_line = HorizontalLine(line, it.HLine(), &pos_hint);
@@ -285,10 +287,14 @@ void Console::Render()
     }
     draw_pos = Point(5, surface.height - 5);
 
+    // Use frame-based blinking instead of time_t
+    static DWORD blink_start = GetTickCount();
+    DWORD elapsed = current_time - blink_start;
+    bool blink_visible = (elapsed / 500) & 1;  // Blink every 500ms
+
     // Render command line with cursor
-    if (state == shown && new_time & 1)  // Blinking cursor when console is shown
+    if (state == shown)
     {
-        // Draw text with cursor in the middle
         std::string before_cursor = current_cmd.substr(0, cursor_pos);
         std::string after_cursor = current_cmd.length() > cursor_pos ?
             current_cmd.substr(cursor_pos) : "";
@@ -302,28 +308,26 @@ void Console::Render()
         }
 
         // Draw cursor character (blinking underscore)
-        surface.DrawText(&font, "_", Point(cursor_x, draw_pos.y), colors[Color::own]);
+        if (blink_visible)
+            surface.DrawText(&font, "_", Point(cursor_x, draw_pos.y), colors[Color::own]);
 
         // Draw text after cursor
         surface.DrawText(&font, after_cursor, Point(cursor_x + CharLength('_'), draw_pos.y), colors[Color::own]);
     }
     else
     {
-        // When console is hidden or on even seconds, show normal blinking cursor
         surface.DrawText(&font, current_cmd, draw_pos, colors[Color::own]);
-        if (!(new_time & 1))
-            surface.DrawText(&font, "_", Point(draw_pos.x + CharLength(current_cmd.back()), draw_pos.y), colors[Color::own]);
     }
 
     dirty = false;
 }
 
-void Console::Draw(uint8_t *framebuf, int w, int h)
+void Console::Draw(uint8_t* framebuf, int w, int h)
 {
     if (state == hidden)
-        return;
+        return;              // ← Exit immediately if hidden
     if (w != resolution::screen_width || h != resolution::screen_height)
-        return; // vois panic?
+        return;
 
     Render();
 
@@ -449,27 +453,34 @@ bool Console::CharHook(wchar_t chr)
     dirty = true;
     switch (chr)
     {
-        case 0x8: // Backspace
-            if (!current_cmd.empty())
-                current_cmd.pop_back();
-            while (!current_cmd.empty() && (current_cmd.back() & 0xc0) == 0xc0)
-                current_cmd.pop_back();
-        break;
-        case 0x1b: // Esc
-            current_cmd.clear();
-            ResetHistoryNavigation();
-        break;
-        case 0xd: // Enter
-            ProcessCommand();
-        break;
-        default:
-        {
-            char buf[8];
-            int count = WideCharToMultiByte(CP_UTF8, 0, &chr, 1, buf, sizeof buf, NULL, NULL);
-            for (int i = 0; i < count; i++)
-                current_cmd.push_back(buf[i]);
+    case 0x8: // Backspace - delete character BEFORE cursor
+        if (cursor_pos > 0) {
+            current_cmd.erase(cursor_pos - 1, 1);
+            cursor_pos--;
         }
         break;
+    case 0x1b: // Esc
+        current_cmd.clear();
+        cursor_pos = 0;
+        ResetHistoryNavigation();
+        break;
+    case 0xd: // Enter
+        ProcessCommand();
+        break;
+    default:
+    {
+        char buf[8];
+        int count = WideCharToMultiByte(CP_UTF8, 0, &chr, 1, buf, sizeof buf, NULL, NULL);
+
+        // Insert at cursor position instead of appending at end
+        if (current_cmd.length() < 512)
+        {
+            for (int i = 0; i < count; i++)
+                current_cmd.insert(cursor_pos + i, 1, buf[i]);
+            cursor_pos += count;
+        }
+    }
+    break;
     }
 
     return true;
@@ -479,38 +490,65 @@ bool Console::KeyHook(int key, int scan)
 {
     switch (scan)
     {
-        case 0x48: // Up
-            if (state != shown)
-                return false;
+    case 0x48: // Up
+        if (state != shown)
+            return false;
+        NavigateHistoryUp();
+        return true;
+        break;
 
-            NavigateHistoryUp();
-            return true;
-            break;
-        case 0x50: // Down
-            if (state != shown)
-                return false;
+    case 0x50: // Down
+        if (state != shown)
+            return false;
+        NavigateHistoryDown();
+        return true;
+        break;
 
-            NavigateHistoryDown();
+    case 0x4B: // Left arrow - move cursor left
+        if (state == shown && cursor_pos > 0) {
+            cursor_pos--;
+            dirty = true;
             return true;
-            break;
-        case 0x4B: // Left
-        case 0x4D: // Right
-            if (state == shown)
-                return true;
-            break;
-        case 0x29:
-            if (state == shown) {
-                Hide();
-                ResetHistoryNavigation();
-            } else {
-                Show();
-                ignore_next = true;
-            }
+        }
+        return false;
+
+    case 0x4D: // Right arrow - move cursor right
+        if (state == shown && cursor_pos < current_cmd.length()) {
+            cursor_pos++;
+            dirty = true;
             return true;
+        }
+        return false;
+
+    case 0x47: // Home - move cursor to start
+        if (state == shown && cursor_pos > 0) {
+            cursor_pos = 0;
+            dirty = true;
+            return true;
+        }
+        return false;
+
+    case 0x4F: // End - move cursor to end
+        if (state == shown && cursor_pos < current_cmd.length()) {
+            cursor_pos = current_cmd.length();
+            dirty = true;
+            return true;
+        }
+        return false;
+
+    case 0x29: // Backtick/Tilde - toggle console
+        if (state == shown) {
+            Hide();
+            ResetHistoryNavigation();
+        }
+        else {
+            Show();
+            ignore_next = true;
+        }
+        return true;
     }
     return false;
 }
-
 void Console::AddCommandToHistory(std::string cmd) {
     // Remove any potential previous occurcances of command in history
     commandsHistory.erase(remove(commandsHistory.begin(), commandsHistory.end(), cmd), commandsHistory.end());

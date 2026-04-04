@@ -1803,12 +1803,15 @@ static void DrawHook(uint8_t* framebuf, xuint w, yuint h)
 {
     if (console)
     {
-        if (IsInGame())
-            ((ScConsole*)console)->DrawDebugInfo(framebuf, w, h);
-        console->Draw(framebuf, w, h);
+        // Only draw console if shown
+        if (((ScConsole*)console)->state == 2)  // ← Add this check
+        {
+            if (IsInGame())
+                ((ScConsole*)console)->DrawDebugInfo(framebuf, w, h);
+            console->Draw(framebuf, w, h);
+        }
     }
 }
-
 void PatchConsole()
 {
     console = new ScConsole;
@@ -1915,33 +1918,6 @@ bool ScConsole::Sc_KeyUp(int key, int scan)
 
 bool ScConsole::KeyHook(int key, int scan)
 {
-    // Handle cursor movement in console
-    if (state == shown) {
-        switch (scan)
-        {
-        case 0x4B: // Left arrow
-            if (cursor_pos > 0) {
-                cursor_pos--;
-                dirty = true;
-            }
-            return true;
-        case 0x4D: // Right arrow
-            if (cursor_pos < current_cmd.length()) {
-                cursor_pos++;
-                dirty = true;
-            }
-            return true;
-        case 0x47: // Home
-            cursor_pos = 0;
-            dirty = true;
-            return true;
-        case 0x4F: // End
-            cursor_pos = current_cmd.length();
-            dirty = true;
-            return true;
-        }
-    }
-
     // Call parent's KeyHook for other keys (up/down history, ~)
     return Console::KeyHook(key, scan);
 }

@@ -106,8 +106,6 @@ class Console
         void Printf(const char *format, ...);
 
         Common::Font *GetFont() { return &font; }
-
-    protected:
         enum state_
         {
             fail,
@@ -115,6 +113,8 @@ class Console
             shown
         } state;
 
+
+    protected:
         std::unordered_map<std::string, CmdFunc> commands;
         uint8_t colors[Color::last];
         bool dirty;
