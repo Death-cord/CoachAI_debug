@@ -132,6 +132,7 @@ class Console
         Common::Font font;
         std::string current_cmd;
         void ProcessCommand();
+        int cursor_pos;
 
     private:
         void Render();
@@ -155,7 +156,6 @@ class Console
 
         bool ignore_next;
         bool clear;
-        int cursor_pos;
 
         Surface surface;
         LogContainer lines;

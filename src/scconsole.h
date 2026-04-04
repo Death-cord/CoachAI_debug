@@ -144,7 +144,6 @@ private:
 
     // Text editing with cursor support
     static constexpr size_t MAX_CMD_LENGTH = 512;  // Maximum command length
-    size_t cursor_pos = 0;  // Current cursor position in current_cmd
 };
 
 void PatchConsole();
