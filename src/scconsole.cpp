@@ -1821,35 +1821,6 @@ void PatchConsole()
     AddDrawHook(&DrawPathingInfo, 450);
 }
 
-typedef LRESULT(CALLBACK WndProc)(HWND, UINT, WPARAM, LPARAM);
-static WndProc* OldWndProc;
-static HWND console_hwnd = NULL;
-LRESULT CALLBACK ConsoleWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
-{
-    if (console)
-    {
-        switch (msg)
-        {
-        case WM_KEYDOWN:
-            if (((ScConsole*)console)->Sc_KeyDown(wparam, (lparam >> 16) & 0xff))
-                return 0;
-            break;
-        case WM_KEYUP:
-            if (((ScConsole*)console)->Sc_KeyUp(wparam, (lparam >> 16) & 0xff))
-                return 0;
-            break;
-        }
-    }
-    return CallWindowProcA(OldWndProc, hwnd, msg, wparam, lparam);
-}
-
-void ScConsole::HookWndProc(void* hwnd)
-{
-    console_hwnd = (HWND)hwnd;
-    OldWndProc = (WndProc*)SetWindowLongPtr((HWND)hwnd, GWLP_WNDPROC, (LONG)&ConsoleWndProc);
-}
-
-
 bool ScConsole::Sc_KeyDown(int key, int scan)
 {
     // Handle cursor movement and text editing when console IS VISIBLE AND SHOWN
@@ -1913,13 +1884,43 @@ bool ScConsole::Sc_KeyUp(int key, int scan)
     return false;
 }
 
-
-// Add this method to ScConsole class to override the base Console::KeyHook
-
 bool ScConsole::KeyHook(int key, int scan)
 {
+    // Handle cursor movement and other keys in console
+    if (state == shown) {
+        switch (scan)
+        {
+        case 0x4B: // Left arrow
+            if (cursor_pos > 0) {
+                cursor_pos--;
+                dirty = true;
+            }
+            return true;
+        case 0x4D: // Right arrow
+            if (cursor_pos < current_cmd.length()) {
+                cursor_pos++;
+                dirty = true;
+            }
+            return true;
+        case 0x47: // Home
+            cursor_pos = 0;
+            dirty = true;
+            return true;
+        case 0x4F: // End
+            cursor_pos = current_cmd.length();
+            dirty = true;
+            return true;
+        }
+    }
+
     // Call parent's KeyHook for other keys (up/down history, ~)
     return Console::KeyHook(key, scan);
+}
+
+void ScConsole::HookWndProc(void* hwnd)
+{
+    // Call parent's implementation
+    Common::Console::HookWndProc(hwnd);
 }
 
 // Updated CharHook version 2 (simpler):

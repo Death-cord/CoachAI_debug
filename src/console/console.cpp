@@ -63,8 +63,8 @@ LineIterator &LineIterator::operator=(LogContainer::iterator it_)
     return *this;
 }
 
-typedef LRESULT (CALLBACK WndProc)(HWND, UINT, WPARAM, LPARAM);
-static WndProc *OldWndProc;
+typedef LRESULT(CALLBACK WndProc)(HWND, UINT, WPARAM, LPARAM);
+static WndProc* OldWndProc;
 static HWND console_hwnd = NULL;
 LRESULT CALLBACK ConsoleWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
@@ -72,13 +72,17 @@ LRESULT CALLBACK ConsoleWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpara
     {
         switch (msg)
         {
-            case WM_CHAR:
-                if (console->CharHook(wparam))
-                    return 0;
+        case WM_CHAR:
+            if (console->CharHook(wparam))
+                return 0;
             break;
-            case WM_KEYDOWN:
-                if (console->KeyHook(wparam, (lparam >> 16) & 0xff))
-                    return 0;
+        case WM_KEYDOWN:
+            if (console->KeyHook(wparam, (lparam >> 16) & 0xff))
+                return 0;
+            break;
+        case WM_KEYUP:
+            // Just pass through to let KeyHook handle it if needed
+            console->KeyHook(wparam, (lparam >> 16) & 0xff);
             break;
         }
     }
