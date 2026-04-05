@@ -1917,12 +1917,6 @@ bool ScConsole::KeyHook(int key, int scan)
     return Console::KeyHook(key, scan);
 }
 
-void ScConsole::HookWndProc(void* hwnd)
-{
-    // Call parent's implementation
-    Common::Console::HookWndProc(hwnd);
-}
-
 // Updated CharHook version 2 (simpler):
 bool ScConsole::CharHook(wchar_t chr)
 {
