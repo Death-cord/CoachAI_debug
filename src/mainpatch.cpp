@@ -10,6 +10,7 @@
 #include "unit.h"
 #include "text.h"
 #include "scconsole.h"
+#include "console/console.h"  // Add this to get the extern console declaration
 #include "order.h"
 #include "limits.h"
 #include "draw.h"
@@ -26,7 +27,11 @@ namespace bw
 void WindowCreatedPatch()
 {
     Common::console->HookWndProc(*bw::main_window_hwnd);
-    ScConsole::HookWndProc(*bw::main_window_hwnd);
+    // Cast to ScConsole and call the instance method
+    if (Common::console)
+    {
+        static_cast<ScConsole*>(Common::console)->HookWndProc(*bw::main_window_hwnd);
+    }
 }
 
 void WinMainPatch()
